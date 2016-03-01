@@ -1,5 +1,5 @@
-#!/usr/bin/python
-# Autor: David Odenwald, 8/5/14
+#!/usr/bin/python3
+# Autor: David Odenwald, 08.05.14
 
 import curses
 import curses.textpad
@@ -7,7 +7,8 @@ import time
 import random
 
 screen = curses.initscr()
-dims = screen.getmaxyx()
+window_height, window_width = screen.getmaxyx()
+
 curses.curs_set(0)
 curses.noecho()
 curses.cbreak()
@@ -30,47 +31,39 @@ def game():
     screen.clear()
     screen.nodelay(1)
     screen.border()
+
     head = [1, 1]
     body = [head[:]] * start_length
-    gameover = False
-    direction = 0  # 0:right 1:down 2:left 3:up
     deadcell = body[-1][:]
+
+    gameover = False
+    direction = 'right'
     foodmade = False
-    from_menu = False
 
     while not gameover:
         while not foodmade:
-            x, y = random.randrange(1, dims[0] - 1), random.randrange(1, dims[1] - 1)
+            x, y = (random.randrange(1, window_height - 1),
+                    random.randrange(1, window_width - 1))
             if screen.inch(y, x) == ord(' '):
                 foodmade = True
                 screen.addch(y, x, ord('@'))
+
+        action = screen.getch()
+        direction = change_direction(action, direction)
+
+        if action == ord('q'):
+            gameover = True
+
         if deadcell not in body:
             screen.addch(deadcell[0], deadcell[1], ' ')
         screen.addch(head[0], head[1], 'X')
 
-        action = screen.getch()
-        if action == curses.KEY_UP and direction != 1:
-            direction = 3
-        elif action == curses.KEY_DOWN and direction != 3:
-            direction = 1
-        elif action == curses.KEY_RIGHT and direction != 2:
-            direction = 0
-        elif action == curses.KEY_LEFT and direction != 0:
-            direction = 2
-
-        if direction == 0:
-            head[1] += 1
-        elif direction == 2:
-            head[1] -= 1
-        elif direction == 1:
-            head[0] += 1
-        elif direction == 3:
-            head[0] -= 1
+        head = next_head_pos(head, direction)
 
         deadcell = body[-1][:]
 
-        for z in range(len(body) - 1, 0, -1):
-            body[z] = body[z - 1]
+        for x in range(len(body) - 1, 0, -1):
+            body[x] = body[x - 1]
 
         body[0] = head[:]
 
@@ -85,59 +78,100 @@ def game():
             else:
                 gameover = True
 
+    score = len(body) - start_length
+    game_over_screen(score)
+
+
+def change_direction(action, direction):
+    if action == curses.KEY_UP and direction != 'down':
+        direction = 'up'
+    elif action == curses.KEY_DOWN and direction != 'up':
+        direction = 'down'
+    elif action == curses.KEY_RIGHT and direction != 'left':
+        direction = 'right'
+    elif action == curses.KEY_LEFT and direction != 'right':
+        direction = 'left'
+
+    return direction
+
+
+def next_head_pos(head, direction):
+    if direction == 'right':
+        head[1] += 1
+    elif direction == 'left':
+        head[1] -= 1
+    elif direction == 'down':
+        head[0] += 1
+    elif direction == 'up':
+        head[0] -= 1
+    return head
+
+
+def game_over_screen(score):
     screen.clear()
     screen.nodelay(0)
-    message1 = 'Game Over'
-    message2 = 'You got ' + str(len(body) - start_length) + ' points'
-    message3 = 'Is your name ' + player_name + '? (Press E to edit)'
-    message4 = 'Press -Space- to play again'
-    message5 = 'Press -M- to enter the menu'
-    message6 = 'Press -Q- to quit'
-    screen.addstr(int(dims[0] / 2 - 3), int((dims[1] - len(message1)) / 2), message1)
-    screen.addstr(int(dims[0] / 2 - 1), int((dims[1] - len(message2)) / 2), message2)
-    screen.addstr(int(dims[0] / 2 + 1), int((dims[1] - len(message3)) / 2), message3)
-    screen.addstr(int(dims[0] / 2 + 3), int((dims[1] - len(message4)) / 2), message4)
-    screen.addstr(int(dims[0] / 2 + 4), int((dims[1] - len(message5)) / 2), message5)
-    screen.addstr(int(dims[0] / 2 + 5), int((dims[1] - len(message6)) / 2), message6)
+
+    lines = ['Game Over',
+             'You got {0} points'.format(score),
+             '',
+             'Is your name ' + player_name + '? (Press E to edit)',
+             '',
+             'Press -Space- to play again',
+             'Press -M- to enter the menu',
+             'Press -Q- to quit']
+
+    for x in range(len(lines)):
+        screen.addstr(int((window_height - len(lines)) / 2 + x),
+                      int((window_width - len(lines[x])) / 2), lines[x])
+
     screen.refresh()
-    q = 0
-    while q not in [32, 113, 81, 109, 77, 101, 69]:
-        q = screen.getch()
-    if q == 32 or q == 81:
-        high_score_set(len(body) - start_length)
+
+    key = 0
+    while key not in [32, 113, 81, 109, 77, 101, 69]:
+        key = screen.getch()
+
+    if key == 32 or key == 81:
+        high_score_set(score)
         game()
-    elif q == 109 or q == 77:
-        high_score_set(len(body) - start_length)
+    elif key == 109 or key == 77:
+        high_score_set(score)
         menu()
-    elif q == 101 or q == 69:
-        change_name(from_menu)
-        high_score_set(len(body) - start_length)
+    elif key == 101 or key == 69:
+        change_name(from_menu=False)
+        high_score_set(score)
         high_score()
     else:
-        high_score_set(len(body) - start_length)
+        high_score_set(score)
         curses.endwin()
 
 
 def menu():
-    a = True
     screen.nodelay(0)
     screen.clear()
     selection = -1
     option = 0
 
     while selection < 0:
-        graphics = [0] * 6
+
+        items = ['Play',
+                 'Instructions',
+                 'Difficulty',
+                 'High Scores',
+                 'Edit Name',
+                 'Exit']
+
+        graphics = [0] * len(items)
         graphics[option] = curses.A_REVERSE
-        screen.addstr(1, 10, 'Snake 1.0')
-        screen.addstr(1, dims[1] - 17, 'Player: ' + player_name)
-        screen.addstr(int(dims[0] / 2 - 2), 10, 'Play', graphics[0])
-        screen.addstr(int(dims[0] / 2 - 1), 10, 'Instructions', graphics[1])
-        screen.addstr(int(dims[0] / 2), 10, 'Difficulty', graphics[2])
-        screen.addstr(int(dims[0] / 2 + 1), 10, 'High Scores', graphics[3])
-        screen.addstr(int(dims[0] / 2 + 2), 10, 'Edit Name', graphics[4])
-        screen.addstr(int(dims[0] / 2 + 3), 10, 'Exit', graphics[5])
-        screen.addstr(int(dims[0] - 2), 10, 'Difficulty: ' + difficulty)
+
+        screen.addstr(1, 5, 'Snake 1.0 by David Odenwald')
+        screen.addstr(1, window_width - 17, 'Player: ' + player_name)
+
+        for x in range(len(items)):
+            screen.addstr(int(window_height / 2 + x), 5, items[x], graphics[x])
+
+        screen.addstr(int(window_height - 2), 5, 'Difficulty: ' + difficulty)
         screen.refresh()
+
         action = screen.getch()
         if action == curses.KEY_UP:
             option = (option - 1) % 6
@@ -145,6 +179,9 @@ def menu():
             option = (option + 1) % 6
         elif action == ord('\n'):
             selection = option
+        elif action == ord('q'):
+            curses.endwin
+            break
 
     if selection == 0:
         game()
@@ -155,7 +192,7 @@ def menu():
     elif selection == 3:
         high_score()
     elif selection == 4:
-        change_name(a)
+        change_name(from_menu=True)
     elif selection == 5:
         curses.endwin()
 
@@ -163,17 +200,23 @@ def menu():
 def instructions():
     screen.clear()
     screen.nodelay(0)
-    lines = ['Use the arrow keys to move', 'Dont run into the wall or the snake', '', 'Press any key to go back']
-    for z in range(len(lines)):
-        screen.addstr(int((dims[0] - len(lines)) / 2 + z), int((dims[1] - len(lines[z])) / 2), lines[z])
+    lines = ['Use the arrow keys to move',
+             'Dont run into the wall or the snake',
+             'Eat food to grow and get points',
+             '',
+             'Press any key to go back']
+    for x in range(len(lines)):
+        screen.addstr(int((window_height - len(lines)) / 2 + x),
+                      int((window_width - len(lines[x])) / 2), lines[x])
     screen.refresh()
     screen.getch()
     menu()
 
 
 def game_options():
-    screen.nodelay(0)
     screen.clear()
+    screen.nodelay(0)
+
     selection = -1
     option = 0
 
@@ -181,9 +224,9 @@ def game_options():
         graphics = [0] * 3
         graphics[option] = curses.A_REVERSE
         screen.addstr(1, 10, 'Difficulty')
-        screen.addstr(int(dims[0] / 2 - 1), 10, 'Normal', graphics[0])
-        screen.addstr(int(dims[0] / 2), 10, 'Hard', graphics[1])
-        screen.addstr(int(dims[0] / 2 + 1), 10, 'Extrem', graphics[2])
+        screen.addstr(int(window_height / 2 - 1), 10, 'Normal', graphics[0])
+        screen.addstr(int(window_height / 2), 10, 'Hard', graphics[1])
+        screen.addstr(int(window_height / 2 + 1), 10, 'Extrem', graphics[2])
 
         screen.refresh()
         action = screen.getch()
@@ -214,7 +257,7 @@ def high_score():
     screen.clear()
     screen.nodelay(0)
     screen.addstr(1, 10, 'Top 10 Players')
-    screen.addstr(int(dims[0] / 2) - 6, 10, 'Rank' + '\t' + 'Name' + '\t' + 'Score')
+    screen.addstr(int(window_height / 2) - 6, 10, 'Rank\tName\tScore')
 
     data = open('highScore.list', 'r')
     scores = data.readlines()
@@ -242,12 +285,14 @@ def high_score():
 
     if len(score) > 10:
         for j in range(10):
-            screen.addstr(int(dims[0] / 2) + (j - 5), 10,
-                          str(j + 1) + '\t' + str(sort_name[j]) + '\t' + str(sort_score[j]))
+            screen.addstr(int(window_height / 2) + (j - 5), 10,
+                          '{0}\t{1}\t{2}'.format(j + 1, sort_name[j],
+                                                 sort_score[j]))
     else:
         for j in range(len(score)):
-            screen.addstr(int(dims[0] / 2) + (j - 5), 10,
-                          str(j + 1) + '\t' + str(sort_name[j]) + '\t' + str(sort_score[j]))
+            screen.addstr(int(window_height / 2) + (j - 5), 10,
+                          '{0}\t{1}\t{2}'.format(j + 1, sort_name[j],
+                                                 sort_score[j]))
 
     screen.refresh()
     screen.getch()
@@ -260,7 +305,7 @@ def high_score_set(score):
     data.close()
 
 
-def change_name(a):
+def change_name(from_menu):
     screen.clear()
     screen.nodelay(0)
     screen.addstr(10, 10, 'Name:')
@@ -268,9 +313,10 @@ def change_name(a):
     text = curses.textpad.Textbox(textwin)
     textwin.bkgd(curses.color_pair(1))
     screen.refresh()
+
     global player_name
     player_name = text.edit()
-    if a:
+    if from_menu:
         menu()
 
 
