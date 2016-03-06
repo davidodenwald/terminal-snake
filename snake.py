@@ -6,6 +6,7 @@ import curses.textpad
 import time
 import random
 import json
+import datetime
 
 screen = curses.initscr()
 window_height, window_width = screen.getmaxyx()
@@ -295,7 +296,8 @@ def show_high_score():
 
 
 def high_score_set(score):
-    time_stamp = time.strftime('%d %b %Y %H:%M', time.gmtime())
+    now = datetime.datetime.now()
+    time_stamp = now.strftime("%d.%m.%Y %H:%M")
     new_entry = {'name': player_name,
                  'score': score,
                  'time': time_stamp}
@@ -309,7 +311,7 @@ def high_score_set(score):
     highscores.append(new_entry)
 
     with open('highscores.json', mode='w') as file_handle:
-        json.dump(highscores, file_handle)
+        json.dump(highscores, file_handle, indent=4)
 
 
 def change_name(from_menu):
