@@ -7,9 +7,9 @@ import time
 import random
 import json
 import datetime
+import os
 
 screen = curses.initscr()
-window_height, window_width = screen.getmaxyx()
 
 curses.curs_set(0)
 curses.noecho()
@@ -19,8 +19,12 @@ screen.border()
 screen.keypad(1)
 random.seed()
 
+score_file = 'scores.json'
+
 curses.start_color()
 curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
+
+window_height, window_width = screen.getmaxyx()
 
 player_name = 'Player'
 start_length = 4
@@ -44,11 +48,11 @@ def game():
 
     while not gameover:
         while not foodmade:
-            x, y = (random.randrange(1, window_height - 1),
-                    random.randrange(1, window_width - 1))
-            if screen.inch(y, x) == ord(' '):
+            x_cord, y_cord = (random.randrange(1, window_width - 1),
+                              random.randrange(1, window_height - 1))
+            if screen.inch(y_cord, x_cord) == ord(' '):
                 foodmade = True
-                screen.addch(y, x, ord('@'))
+                screen.addch(y_cord, x_cord, ord('@'))
 
         action = screen.getch()
         direction = change_direction(action, direction)
@@ -262,12 +266,16 @@ def show_high_score():
 
     screen.addstr(1, 10, 'Top 10 Players')
     screen.addstr(height, 5, 'Rank')
-    screen.addstr(height, 15, 'Name')
-    screen.addstr(height, 30, 'Score')
-    screen.addstr(height, 40, 'Date')
+    screen.addstr(height, 14, 'Name')
+    screen.addstr(height, 23, 'Score')
+    screen.addstr(height, 33, 'Difficulty')
+    screen.addstr(height, 48, 'Date')
+
+    if not os.path.exists(score_file):
+        open(score_file, 'w+')
 
     # load the highscores.json file
-    with open('highscores.json') as file_handle:
+    with open(score_file) as file_handle:
         try:
             highscores = json.load(file_handle)
         except ValueError:
@@ -280,9 +288,11 @@ def show_high_score():
             height = int(window_height / 2) - 6 + rank
 
             screen.addstr(height, 5, str(rank))
-            screen.addstr(height, 15, high_score['name'])
-            screen.addstr(height, 30, str(high_score['score']))
-            screen.addstr(height, 40, high_score['time'])
+            screen.addstr(height, 14, high_score['name'])
+            screen.addstr(height, 28 - len(str(high_score['score'])),
+                          str(high_score['score']))
+            screen.addstr(height, 43 - len(difficulty), difficulty)
+            screen.addstr(height, 48, high_score['time'])
 
             rank += 1
 
@@ -297,12 +307,16 @@ def show_high_score():
 
 def high_score_set(score):
     now = datetime.datetime.now()
-    time_stamp = now.strftime("%d.%m.%Y %H:%M")
+    time_stamp = now.strftime('%H:%M %d.%m.%Y')
     new_entry = {'name': player_name,
                  'score': score,
-                 'time': time_stamp}
+                 'time': time_stamp,
+                 'difficulty': difficulty}
 
-    with open('highscores.json', mode='r') as file_handle:
+    if not os.path.exists(score_file):
+        open(score_file, 'w+')
+
+    with open(score_file, mode='r') as file_handle:
         try:
             highscores = json.load(file_handle)
         except ValueError:
@@ -310,7 +324,7 @@ def high_score_set(score):
 
     highscores.append(new_entry)
 
-    with open('highscores.json', mode='w') as file_handle:
+    with open(score_file, mode='w') as file_handle:
         json.dump(highscores, file_handle, indent=4)
 
 
@@ -328,6 +342,5 @@ def change_name(from_menu):
     if from_menu:
         menu()
 
-
-menu()
-curses.endwin()
+if __name__ == "__main__":
+    menu()
