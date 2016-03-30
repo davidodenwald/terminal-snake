@@ -291,7 +291,8 @@ def show_high_score():
             screen.addstr(height, 14, high_score['name'])
             screen.addstr(height, 28 - len(str(high_score['score'])),
                           str(high_score['score']))
-            screen.addstr(height, 43 - len(difficulty), difficulty)
+            screen.addstr(height, 43 - len(high_score["difficulty"]), 
+			  high_score["difficulty"])
             screen.addstr(height, 48, high_score['time'])
 
             rank += 1
